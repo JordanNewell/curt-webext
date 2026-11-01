@@ -1,0 +1,28 @@
+{
+	"manifest_version": 3,
+	"name": "Curt Conversation Exporter",
+	"version": "0.1.0",
+	"description": "Export live AI chat conversations to the open .curt format.",
+	"browser_specific_settings": {
+		"gecko": {
+			"id": "curt-webext@curt.fyi",
+			"strict_min_version": "115.0",
+			"data_collection_permissions": {
+				"required": ["none"]
+			}
+		}
+	},
+	"permissions": ["activeTab", "downloads"],
+	"host_permissions": ["https://claude.ai/*"],
+	"action": {
+		"default_popup": "src/ui/popup.html",
+		"default_title": "Export conversation as .curt"
+	},
+	"content_scripts": [
+		{
+			"matches": ["https://claude.ai/*"],
+			"js": ["src/adapters/claude/content.js"],
+			"run_at": "document_idle"
+		}
+	]
+}
