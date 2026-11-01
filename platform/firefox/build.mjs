@@ -7,6 +7,7 @@
 // Zip tool, in order of preference: web-ext (npm i -D web-ext), then
 // PowerShell Compress-Archive (Windows fallback). AMO accepts either zip.
 import { execFileSync } from "node:child_process";
+import { build as esbuildBuild } from "esbuild";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,6 +24,20 @@ if (
 ) {
 	console.error("dist/src output missing — run `tsc` first (npm run build).");
 	process.exit(1);
+}
+
+// Content scripts must be CLASSIC scripts — transform tsc's ESM output to
+// IIFE in place before staging (idempotent; also run by the Chrome build,
+// which may have already done it depending on invocation order).
+for (const rel of ["src/adapters/chatgpt/content.js", "src/adapters/claude/content.js"]) {
+	await esbuildBuild({
+		entryPoints: [join(dist, rel)],
+		allowOverwrite: true,
+		bundle: true,
+		format: "iife",
+		outfile: join(dist, rel),
+		logLevel: "warning",
+	});
 }
 
 rmSync(stage, { recursive: true, force: true });
