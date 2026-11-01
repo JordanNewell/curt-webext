@@ -15,21 +15,31 @@
 
 import type { CurtConversation, CurtMessage, CurtRole, ExtractResult } from "../../core/types.js";
 
-const ROLE_SELECTOR = "[data-message-author-role]";
+// 2026-11 DOM: message nodes are `[data-conversation-role]` inside a turn
+// container carrying `data-turn-key` (uuid). Legacy era used
+// `[data-message-author-role]` + `data-message-id` — still matched so the
+// adapter survives on either rendering.
+const ROLE_SELECTOR = "[data-conversation-role],[data-message-author-role]";
+const TURN_ATTR = "data-turn-key";
 const KNOWN_ROLES: readonly CurtRole[] = ["user", "assistant", "system", "tool"];
 const PROVIDER = "openai";
 /** Assistant messages carry a model tag here when the page exposes one. */
 const MODEL_ATTR = "data-message-model";
+/** Elements stripped before text extraction (labels, actions, chrome). */
+const STRIP_SELECTOR =
+	"script,style,noscript,template,svg,button,canvas,[class*='sr-only'],[data-testid*='scroll-footer']";
+/** Site disclaimer appended under turns — never part of the conversation. */
+const DISCLAIMER_RE = /\s*ChatGPT can make mistakes\.?\s*Check important info\.?\s*$/i;
 /** Candidate selectors probed on a zero-message result — live-DOM triage. */
 const PROBE_SELECTORS: readonly string[] = [
+	"[data-conversation-role]",
+	"[data-turn-key]",
 	"[data-message-author-role]",
 	"[data-message-id]",
 	"[data-testid^='conversation-turn']",
-	"[data-testid^='message']",
 	"article",
-	"[class*='markdown']",
+	"[data-markdown-copy]",
 	"[class*='message']",
-	"[data-starting-point]",
 ];
 
 interface ExtractOptions {
@@ -91,38 +101,72 @@ export function extractConversation(doc: Document, options: ExtractOptions = {})
 	const messages: CurtMessage[] = [];
 	const seenIds = new Set<string>();
 
-	for (const node of source.querySelectorAll(ROLE_SELECTOR)) {
-		const rawRole = node.getAttribute("data-message-author-role") ?? "";
-		const role = KNOWN_ROLES.find((r) => r === rawRole);
-		if (!role) {
-			skippedUnparseable++;
-			continue;
+	// 2026-11 DOM: `[data-conversation-role]` nodes are print-style LABEL
+	// headers ("You said:" / "ChatGPT said:") inside a `[data-turn-key]`
+	// container — the message bubbles are their FOLLOWING SIBLINGS. So per
+	// turn container: role markers switch the attribution target, and every
+	// non-marker block between markers belongs to that role.
+	const turns = source.querySelectorAll(`[${TURN_ATTR}]`);
+	if (turns.length > 0) {
+		for (const turnEl of turns) {
+			const turnKey = turnEl.getAttribute(TURN_ATTR) ?? `turn-${messages.length}`;
+			if (seenIds.has(turnKey)) {
+				skippedDuplicates++;
+				continue;
+			}
+			seenIds.add(turnKey);
+
+			const segments = walkTurn(turnEl);
+			let segInTurn = 0;
+			for (const seg of segments) {
+				const content = seg.parts
+					.join("")
+					.replace(/[ \t]+\n/g, "\n")
+					.trim()
+					.replace(DISCLAIMER_RE, "")
+					.trim();
+				if (!content) {
+					skippedUnparseable++;
+					continue;
+				}
+				messages.push({
+					id: `${turnKey}-${segInTurn++}`,
+					role: seg.role,
+					content,
+					timestamp: now,
+				});
+			}
 		}
-
-		const domId = node.getAttribute("data-message-id");
-		if (domId && seenIds.has(domId)) {
-			skippedDuplicates++;
-			continue;
+	} else {
+		// Legacy DOM: role elements ARE the message bodies.
+		for (const node of source.querySelectorAll(ROLE_SELECTOR)) {
+			const rawRole = node.getAttribute("data-message-author-role") ?? "";
+			const role = KNOWN_ROLES.find((r) => r === rawRole);
+			if (!role) {
+				skippedUnparseable++;
+				continue;
+			}
+			const domId = node.getAttribute("data-message-id");
+			if (domId && seenIds.has(domId)) {
+				skippedDuplicates++;
+				continue;
+			}
+			const content = normalize(node);
+			if (!content) {
+				skippedUnparseable++;
+				continue;
+			}
+			const message: CurtMessage = {
+				id: domId ?? `chatgpt-msg-${messages.length}`,
+				role,
+				content,
+				timestamp: now,
+			};
+			const model = node.getAttribute(MODEL_ATTR);
+			if (model) message.model = model;
+			if (domId) seenIds.add(domId);
+			messages.push(message);
 		}
-
-		const content = normalize(node);
-		if (!content) {
-			// Streaming placeholders and empty turns carry nothing worth saving.
-			skippedUnparseable++;
-			continue;
-		}
-
-		const message: CurtMessage = {
-			id: domId ?? `chatgpt-msg-${messages.length}`,
-			role,
-			content,
-			timestamp: now,
-		};
-		const model = node.getAttribute(MODEL_ATTR);
-		if (model) message.model = model;
-
-		if (domId) seenIds.add(domId);
-		messages.push(message);
 	}
 
 	const conversation: CurtConversation = {
@@ -160,12 +204,112 @@ export function extractConversation(doc: Document, options: ExtractOptions = {})
 	};
 }
 
-/** innerText when the environment has it, textContent otherwise; trimmed. */
+/**
+ * Walk one `[data-turn-key]` container. `data-conversation-role` markers
+ * are label headers that SWITCH the attribution target — the message text
+ * is the non-marker content that follows each marker until the next one.
+ * Block-aware, verbatim pre/code, strips actions/labels/chrome.
+ */
+interface Segment {
+	role: CurtRole;
+	parts: string[];
+}
+
+function walkTurn(turnEl: Element): Segment[] {
+	const segments: Segment[] = [];
+	let current: Segment | null = null;
+	const push = (s: string): void => {
+		if (current) current.parts.push(s);
+	};
+	const boundary = (): void => {
+		if (!current) return;
+		const last = current.parts[current.parts.length - 1];
+		if (last === undefined || !last.endsWith("\n")) current.parts.push("\n");
+	};
+
+	const walk = (node: Node): void => {
+		if (isElement(node)) {
+			const convRole = node.getAttribute("data-conversation-role");
+			if (convRole !== null) {
+				const role = KNOWN_ROLES.find((r) => r === convRole);
+				if (role) {
+					current = { role, parts: [] };
+					segments.push(current);
+				}
+				return; // label header — never descend
+			}
+			if (node.matches(STRIP_SELECTOR)) return;
+			if (node.tagName === "PRE") {
+				push(node.textContent ?? "");
+				boundary();
+				return;
+			}
+			if (node.tagName === "BR") {
+				push("\n");
+				return;
+			}
+			for (const child of Array.from(node.childNodes)) walk(child);
+			if (BLOCK_TAGS.has(node.tagName)) boundary();
+			return;
+		}
+		if (node.nodeType === 3 && current) push(node.nodeValue ?? ""); // TEXT_NODE
+	};
+
+	walk(turnEl);
+	return segments;
+}
+
+/**
+ * Block-aware plain text on a detached clone: strips action buttons,
+ * screen-reader labels ("You said:") and chrome, keeps pre/code verbatim,
+ * inserts one newline per block boundary. Deliberately avoids `innerText`
+ * (CSS-layout dependent, untestable in jsdom). Legacy-DOM path.
+ */
 function normalize(node: Element): string {
-	const htmlEl = node as HTMLElement;
-	const raw =
-		typeof htmlEl.innerText === "string" ? htmlEl.innerText : (node.textContent ?? "");
-	return raw.replace(/\r\n?/g, "\n").trim();
+	const clone = node.cloneNode(true) as Element;
+	for (const junk of clone.querySelectorAll(STRIP_SELECTOR)) junk.remove();
+	const parts: string[] = [];
+	collect(clone, parts);
+	return parts
+		.join("")
+		.replace(/[ \t]+\n/g, "\n")
+		.trim();
+}
+
+/** Block-level elements get one newline separator; nested blocks don't stack. */
+const BLOCK_TAGS = new Set([
+	"ADDRESS", "ARTICLE", "ASIDE", "BLOCKQUOTE", "DD", "DETAILS", "DIALOG",
+	"DIV", "DL", "DT", "FIELDSET", "FIGCAPTION", "FIGURE", "FOOTER", "FORM",
+	"H1", "H2", "H3", "H4", "H5", "H6", "HEADER", "HGROUP", "LI", "MAIN",
+	"NAV", "OL", "P", "PRE", "SECTION", "TABLE", "TR", "UL",
+]);
+
+function isElement(node: Node): node is Element {
+	return node.nodeType === 1; // Node.ELEMENT_NODE
+}
+
+function boundary(out: string[]): void {
+	const last = out[out.length - 1];
+	if (last !== undefined && last.endsWith("\n")) return;
+	out.push("\n");
+}
+
+function collect(node: Node, out: string[]): void {
+	if (isElement(node)) {
+		if (node.tagName === "PRE") {
+			out.push(node.textContent ?? "");
+			boundary(out);
+			return;
+		}
+		if (node.tagName === "BR") {
+			out.push("\n");
+			return;
+		}
+		for (const child of Array.from(node.childNodes)) collect(child, out);
+		if (BLOCK_TAGS.has(node.tagName)) boundary(out);
+		return;
+	}
+	if (node.nodeType === 3) out.push(node.nodeValue ?? ""); // TEXT_NODE
 }
 
 /** "abc123-..." from /c/<uuid> -> "chatgpt_abc123-..."; else time-derived. */
