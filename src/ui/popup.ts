@@ -59,6 +59,7 @@ async function exportActiveTab(tab: chrome.tabs.Tab): Promise<void> {
 			`No messages found${result.skippedUnparseable ? ` (${result.skippedUnparseable} node(s) skipped)` : ""}.${probe} @ ${result.sourceUrl}`,
 			true,
 		);
+		showDumpButton(tab.id);
 		return;
 	}
 
@@ -85,6 +86,37 @@ async function exportActiveTab(tab: chrome.tabs.Tab): Promise<void> {
 	} catch (err) {
 		setStatus(`Download failed: ${err instanceof Error ? err.message : "unknown"}`, true);
 	}
+}
+
+/** Debug triage: pull the page's serialized DOM into a downloadable file. */
+function showDumpButton(tabId: number): void {
+	const dump = document.getElementById("dump");
+	if (!dump) return;
+	dump.hidden = false;
+	dump.addEventListener("click", () => {
+		void (async () => {
+			try {
+				const res = (await chrome.tabs.sendMessage(tabId, { type: "curt:debugdom" })) as {
+					html?: string;
+					url?: string;
+				};
+				if (!res?.html) {
+					setStatus("DOM dump: empty response.", true);
+					return;
+				}
+				const url = URL.createObjectURL(new Blob([res.html], { type: "text/html" }));
+				await chrome.downloads.download({
+					url,
+					filename: `curt-debug-dom-${new URL(res.url ?? "https://x.example").host}.html`,
+					saveAs: false,
+				});
+				setTimeout(() => URL.revokeObjectURL(url), 60_000);
+				setStatus("DOM dump downloaded.");
+			} catch {
+				setStatus("DOM dump failed — adapter unreachable.", true);
+			}
+		})();
+	});
 }
 
 async function init(): Promise<void> {

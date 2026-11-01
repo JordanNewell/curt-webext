@@ -266,9 +266,21 @@ const isExtractRequest = (msg: unknown): msg is ExtractRequest =>
 
 if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
 	chrome.runtime.onMessage.addListener((msg: unknown, _sender, sendResponse) => {
+		if (isDebugDomRequest(msg)) {
+			// Debug triage: hand back the serialized page for selector work.
+			const html = document.documentElement.outerHTML;
+			sendResponse({ type: "curt:debugdom", url: location.href, html });
+			return;
+		}
 		if (!isExtractRequest(msg)) return; // not ours; let other listeners answer
 		const result = extractConversation(document);
 		sendResponse(result);
 		// Synchronous response; no `return true` needed.
 	});
+}
+
+function isDebugDomRequest(msg: unknown): boolean {
+	return (
+		typeof msg === "object" && msg !== null && (msg as ExtractRequest).type === "curt:debugdom"
+	);
 }
