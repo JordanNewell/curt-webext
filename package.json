@@ -1,0 +1,23 @@
+{
+	"name": "curt-webext",
+	"version": "0.1.0",
+	"description": "Cross-browser extension that exports live AI chat conversations to the open .curt format",
+	"license": "MIT",
+	"private": true,
+	"type": "module",
+	"engines": {
+		"node": ">=18"
+	},
+	"scripts": {
+		"build": "tsc && node platform/chrome/build.mjs",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"devDependencies": {
+		"@types/chrome": "^0.1.0",
+		"curt-format": "^1.2.0",
+		"jsdom": "^25.0.0",
+		"typescript": "^5.6.0",
+		"vitest": "^3.0.0"
+	}
+}
