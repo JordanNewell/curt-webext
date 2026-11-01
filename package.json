@@ -1,6 +1,6 @@
 {
 	"name": "curt-webext",
-	"version": "0.1.0",
+	"version": "1.0.0",
 	"description": "Cross-browser extension that exports live AI chat conversations to the open .curt format",
 	"license": "MIT",
 	"private": true,

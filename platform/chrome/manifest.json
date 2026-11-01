@@ -1,16 +1,22 @@
 {
 	"manifest_version": 3,
 	"name": "Curt Conversation Exporter",
-	"version": "0.1.0",
+	"version": "1.0.0",
 	"description": "Export live AI chat conversations to the open .curt format.",
-	"permissions": ["activeTab", "downloads"],
+	"permissions": [
+		"activeTab",
+		"downloads"
+	],
 	"icons": {
 		"16": "platform/icons/icon16.png",
 		"32": "platform/icons/icon32.png",
 		"48": "platform/icons/icon48.png",
 		"128": "platform/icons/icon128.png"
 	},
-	"host_permissions": ["https://chatgpt.com/*", "https://claude.ai/*"],
+	"host_permissions": [
+		"https://chatgpt.com/*",
+		"https://claude.ai/*"
+	],
 	"background": {
 		"service_worker": "platform/chrome/service-worker.js",
 		"type": "module"
@@ -26,13 +32,21 @@
 	},
 	"content_scripts": [
 		{
-			"matches": ["https://chatgpt.com/*"],
-			"js": ["src/adapters/chatgpt/content.js"],
+			"matches": [
+				"https://chatgpt.com/*"
+			],
+			"js": [
+				"src/adapters/chatgpt/content.js"
+			],
 			"run_at": "document_idle"
 		},
 		{
-			"matches": ["https://claude.ai/*"],
-			"js": ["src/adapters/claude/content.js"],
+			"matches": [
+				"https://claude.ai/*"
+			],
+			"js": [
+				"src/adapters/claude/content.js"
+			],
 			"run_at": "document_idle"
 		}
 	]
