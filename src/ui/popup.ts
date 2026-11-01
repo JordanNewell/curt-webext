@@ -51,7 +51,7 @@ async function exportActiveTab(tab: chrome.tabs.Tab): Promise<void> {
 		const probe = result.probe
 			? " probe: " +
 			  Object.entries(result.probe)
-					.filter(([, n]) => n > 0)
+					.filter(([, n]) => typeof n === "number" ? n > 0 : n.length > 0)
 					.map(([sel, n]) => `${sel}=${n}`)
 					.join(" ") || "all-zero"
 			: "";

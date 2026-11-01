@@ -236,7 +236,7 @@ export function extractConversation(doc: Document, options: ExtractOptions = {})
 		provider: PROVIDER,
 	};
 
-	const probe: Record<string, number> = {};
+	const probe: Record<string, number | string> = {};
 	if (messages.length === 0) {
 		for (const sel of PROBE_SELECTORS) {
 			probe[sel] = doc.querySelectorAll(sel).length;

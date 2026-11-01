@@ -41,18 +41,57 @@ interface ExtractOptions {
 	title?: string;
 }
 
+/**
+ * Documents to search, top frame first, then same-origin iframes (the app
+ * shell sometimes hosts the conversation in a child frame — the top-frame
+ * content script sees only the shell there). Cross-origin iframes yield
+ * `doc: null` but keep their src for the probe.
+ */
+interface FrameDoc {
+	doc: Document | null;
+	src: string;
+}
+
+function candidateDocs(doc: Document): FrameDoc[] {
+	const frames: FrameDoc[] = [{ doc, src: doc.defaultView?.location.href ?? "" }];
+	for (const frame of doc.querySelectorAll("iframe")) {
+		const src = frame.getAttribute("src") ?? "";
+		let inner: Document | null = null;
+		try {
+			inner = (frame as HTMLIFrameElement).contentDocument;
+		} catch {
+			// cross-origin: contentDocument throws or is null depending on browser
+		}
+		frames.push({ doc: inner, src });
+	}
+	return frames;
+}
+
 /** Extract the conversation currently rendered in `doc`. Never throws. */
 export function extractConversation(doc: Document, options: ExtractOptions = {}): ExtractResult {
 	const now = options.now ?? Date.now();
 	const loc = options.location ?? doc.defaultView?.location ?? { href: "", pathname: "/" };
 	const title = options.title ?? doc.title;
 
+	const frames = candidateDocs(doc);
+	// Walk the frame holding the most role nodes (top frame wins ties).
+	let source = doc;
+	let bestCount = doc.querySelectorAll(ROLE_SELECTOR).length;
+	frames.forEach((f, i) => {
+		if (i === 0 || !f.doc) return;
+		const n = f.doc.querySelectorAll(ROLE_SELECTOR).length;
+		if (n > bestCount) {
+			bestCount = n;
+			source = f.doc;
+		}
+	});
+
 	let skippedUnparseable = 0;
 	let skippedDuplicates = 0;
 	const messages: CurtMessage[] = [];
 	const seenIds = new Set<string>();
 
-	for (const node of doc.querySelectorAll(ROLE_SELECTOR)) {
+	for (const node of source.querySelectorAll(ROLE_SELECTOR)) {
 		const rawRole = node.getAttribute("data-message-author-role") ?? "";
 		const role = KNOWN_ROLES.find((r) => r === rawRole);
 		if (!role) {
@@ -95,18 +134,21 @@ export function extractConversation(doc: Document, options: ExtractOptions = {})
 		provider: PROVIDER,
 	};
 
-	const probe: Record<string, number> = {};
+	const probe: Record<string, number | string> = {};
 	if (messages.length === 0) {
 		for (const sel of PROBE_SELECTORS) {
-			probe[sel] = doc.querySelectorAll(sel).length;
+			probe[sel] = source.querySelectorAll(sel).length;
 		}
-		probe.__elements = doc.querySelectorAll("*").length;
-		let shadowHosts = 0;
-		for (const el of doc.querySelectorAll("*")) {
-			if ((el as HTMLElement).shadowRoot) shadowHosts++;
-		}
-		probe.__shadowHosts = shadowHosts;
-		probe.__iframes = doc.querySelectorAll("iframe").length;
+		frames.forEach((f, i) => {
+			const tag = `__frame${i}`;
+			if (!f.doc) {
+				probe[tag] = `X-ORIGIN ${f.src.slice(0, 60)}`;
+			} else if (i === 0) {
+				probe[tag] = f.doc.querySelectorAll("*").length;
+			} else {
+				probe[tag] = `${f.doc.querySelectorAll("*").length}el ${f.src.slice(0, 60)}`;
+			}
+		});
 	}
 
 	return {
