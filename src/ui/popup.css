@@ -1,0 +1,74 @@
+/* Popup UI: minimal, monochrome, system fonts. No gradients, no glow. */
+
+:root {
+	color-scheme: dark;
+	--bg: #111111;
+	--surface: #1a1a1a;
+	--border: #2a2a2a;
+	--text: #f2f2f2;
+	--muted: #9a9a9a;
+	--accent: #4ec96a;
+	--error: #e5484d;
+}
+
+body {
+	margin: 0;
+	padding: 12px;
+	width: 280px;
+	background: var(--bg);
+	color: var(--text);
+	font: 13px/1.4 system-ui, sans-serif;
+}
+
+header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.mark {
+	color: var(--accent);
+	font-family: ui-monospace, monospace;
+	font-weight: 700;
+}
+
+h1 {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+}
+
+#status {
+	margin: 0 0 12px;
+	min-height: 3.4em;
+	color: var(--muted);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+#status.error {
+	color: var(--error);
+}
+
+#export {
+	width: 100%;
+	padding: 8px 12px;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	background: var(--surface);
+	color: var(--text);
+	font: inherit;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+#export:hover:not(:disabled) {
+	border-color: var(--accent);
+}
+
+#export:disabled {
+	opacity: 0.5;
+	cursor: default;
+}

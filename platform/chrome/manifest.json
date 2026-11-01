@@ -1,0 +1,23 @@
+{
+	"manifest_version": 3,
+	"name": "Curt Conversation Exporter",
+	"version": "0.1.0",
+	"description": "Export live AI chat conversations to the open .curt format.",
+	"permissions": ["activeTab", "downloads"],
+	"host_permissions": ["https://chatgpt.com/*"],
+	"background": {
+		"service_worker": "platform/chrome/service-worker.js",
+		"type": "module"
+	},
+	"action": {
+		"default_popup": "src/ui/popup.html",
+		"default_title": "Export conversation as .curt"
+	},
+	"content_scripts": [
+		{
+			"matches": ["https://chatgpt.com/*"],
+			"js": ["src/adapters/chatgpt/content.js"],
+			"run_at": "document_idle"
+		}
+	]
+}
