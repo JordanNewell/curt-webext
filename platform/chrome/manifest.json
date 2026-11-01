@@ -10,7 +10,7 @@
 		"48": "platform/icons/icon48.png",
 		"128": "platform/icons/icon128.png"
 	},
-	"host_permissions": ["https://chatgpt.com/*"],
+	"host_permissions": ["https://chatgpt.com/*", "https://claude.ai/*"],
 	"background": {
 		"service_worker": "platform/chrome/service-worker.js",
 		"type": "module"
@@ -28,6 +28,11 @@
 		{
 			"matches": ["https://chatgpt.com/*"],
 			"js": ["src/adapters/chatgpt/content.js"],
+			"run_at": "document_idle"
+		},
+		{
+			"matches": ["https://claude.ai/*"],
+			"js": ["src/adapters/claude/content.js"],
 			"run_at": "document_idle"
 		}
 	]
