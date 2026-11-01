@@ -42,4 +42,6 @@ export interface ExtractResult {
 	skippedDuplicates: number;
 	/** Source page URL the conversation was captured from. */
 	sourceUrl: string;
+	/** Live-DOM diagnostic: candidate selector → match count (0-message triage). */
+	probe?: Record<string, number>;
 }

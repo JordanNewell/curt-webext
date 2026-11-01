@@ -48,8 +48,15 @@ async function exportActiveTab(tab: chrome.tabs.Tab): Promise<void> {
 	const result = raw;
 	const { conversation } = result;
 	if (conversation.messages.length === 0) {
+		const probe = result.probe
+			? " probe: " +
+			  Object.entries(result.probe)
+					.filter(([, n]) => n > 0)
+					.map(([sel, n]) => `${sel}=${n}`)
+					.join(" ") || "all-zero"
+			: "";
 		setStatus(
-			`No messages found${result.skippedUnparseable ? ` (${result.skippedUnparseable} node(s) skipped)` : ""}.`,
+			`No messages found${result.skippedUnparseable ? ` (${result.skippedUnparseable} node(s) skipped)` : ""}.${probe}`,
 			true,
 		);
 		return;

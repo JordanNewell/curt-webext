@@ -20,6 +20,17 @@ const KNOWN_ROLES: readonly CurtRole[] = ["user", "assistant", "system", "tool"]
 const PROVIDER = "openai";
 /** Assistant messages carry a model tag here when the page exposes one. */
 const MODEL_ATTR = "data-message-model";
+/** Candidate selectors probed on a zero-message result — live-DOM triage. */
+const PROBE_SELECTORS: readonly string[] = [
+	"[data-message-author-role]",
+	"[data-message-id]",
+	"[data-testid^='conversation-turn']",
+	"[data-testid^='message']",
+	"article",
+	"[class*='markdown']",
+	"[class*='message']",
+	"[data-starting-point]",
+];
 
 interface ExtractOptions {
 	/** Overrides Date.now() (tests). */
@@ -84,11 +95,19 @@ export function extractConversation(doc: Document, options: ExtractOptions = {})
 		provider: PROVIDER,
 	};
 
+	const probe: Record<string, number> = {};
+	if (messages.length === 0) {
+		for (const sel of PROBE_SELECTORS) {
+			probe[sel] = doc.querySelectorAll(sel).length;
+		}
+	}
+
 	return {
 		conversation,
 		skippedUnparseable,
 		skippedDuplicates,
 		sourceUrl: loc.href,
+		...(messages.length === 0 ? { probe } : {}),
 	};
 }
 

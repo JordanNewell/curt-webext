@@ -29,6 +29,19 @@ const ASSISTANT_SELECTOR =
 	'[data-testid="assistant-response"],[data-test-id="assistant-response"]';
 const ASSISTANT_FALLBACK_SELECTOR = ".font-claude-message";
 const PROVIDER = "anthropic";
+/** Candidate selectors probed on a zero-message result — live-DOM triage. */
+const PROBE_SELECTORS: readonly string[] = [
+	'[data-testid="user-message"]',
+	'[data-testid="assistant-response"]',
+	'[data-test-id="user-message"]',
+	'[data-test-id="assistant-response"]',
+	".font-claude-message",
+	"[data-testid]",
+	"[data-message-id]",
+	"article",
+	"[class*='message']",
+	"[data-is-streaming]",
+];
 
 /** Block-level elements get one newline separator; nested blocks don't stack. */
 const BLOCK_TAGS = new Set([
@@ -223,11 +236,19 @@ export function extractConversation(doc: Document, options: ExtractOptions = {})
 		provider: PROVIDER,
 	};
 
+	const probe: Record<string, number> = {};
+	if (messages.length === 0) {
+		for (const sel of PROBE_SELECTORS) {
+			probe[sel] = doc.querySelectorAll(sel).length;
+		}
+	}
+
 	return {
 		conversation,
 		skippedUnparseable,
 		skippedDuplicates: duplicates.count,
 		sourceUrl: loc.href,
+		...(messages.length === 0 ? { probe } : {}),
 	};
 }
 
