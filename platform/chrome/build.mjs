@@ -15,10 +15,12 @@ if (!existsSync(join(dist, "src", "ui", "popup.js"))) {
 }
 
 mkdirSync(join(dist, "platform", "chrome"), { recursive: true });
+mkdirSync(join(dist, "platform", "icons"), { recursive: true });
 mkdirSync(join(dist, "src", "ui"), { recursive: true });
 
 cpSync(join(root, "platform", "chrome", "manifest.json"), join(dist, "manifest.json"));
 cpSync(join(root, "src", "ui", "popup.html"), join(dist, "src", "ui", "popup.html"));
 cpSync(join(root, "src", "ui", "popup.css"), join(dist, "src", "ui", "popup.css"));
+cpSync(join(root, "platform", "icons"), join(dist, "platform", "icons"), { recursive: true });
 
 console.log("dist/ ready — load as an unpacked extension in Chrome.");

@@ -27,6 +27,7 @@ if (
 
 rmSync(stage, { recursive: true, force: true });
 mkdirSync(join(stage, "src"), { recursive: true });
+mkdirSync(join(stage, "platform", "icons"), { recursive: true });
 mkdirSync(artifacts, { recursive: true });
 
 cpSync(join(root, "platform", "firefox", "manifest.json"), join(stage, "manifest.json"));
@@ -34,6 +35,8 @@ cpSync(join(root, "platform", "firefox", "manifest.json"), join(stage, "manifest
 // registry + core at runtime) and the content scripts named in the manifest.
 // tsc does not clean outDir, so copying dist/src wholesale would sweep in
 // stale outputs from removed modules.
+cpSync(join(root, "platform", "icons"), join(stage, "platform", "icons"), { recursive: true });
+
 for (const rel of ["src/ui", "src/core", "src/adapters/registry.js", "src/adapters/claude", "src/adapters/chatgpt"]) {
 	cpSync(join(dist, rel), join(stage, rel), { recursive: true });
 }
