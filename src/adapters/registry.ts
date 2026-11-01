@@ -17,6 +17,11 @@ export const ADAPTERS: readonly AdapterInfo[] = [
 		label: "ChatGPT",
 		hostPatterns: ["chatgpt.com"],
 	},
+	{
+		id: "claude",
+		label: "Claude",
+		hostPatterns: ["claude.ai"],
+	},
 ];
 
 /** True when `url` is served by one of the registered adapters. */

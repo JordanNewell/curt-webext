@@ -18,7 +18,8 @@ const artifacts = join(dist, "artifacts");
 
 if (
 	!existsSync(join(dist, "src", "ui", "popup.js")) ||
-	!existsSync(join(dist, "src", "adapters", "claude", "content.js"))
+	!existsSync(join(dist, "src", "adapters", "claude", "content.js")) ||
+	!existsSync(join(dist, "src", "adapters", "chatgpt", "content.js"))
 ) {
 	console.error("dist/src output missing — run `tsc` first (npm run build).");
 	process.exit(1);
@@ -30,10 +31,10 @@ mkdirSync(artifacts, { recursive: true });
 
 cpSync(join(root, "platform", "firefox", "manifest.json"), join(stage, "manifest.json"));
 // Copy only what this build actually loads: the popup (an ES module importing
-// registry + core at runtime) and the claude.ai content script named in the
-// manifest. tsc does not clean outDir, so copying dist/src wholesale would
-// sweep in stale outputs from removed modules.
-for (const rel of ["src/ui", "src/core", "src/adapters/registry.js", "src/adapters/claude"]) {
+// registry + core at runtime) and the content scripts named in the manifest.
+// tsc does not clean outDir, so copying dist/src wholesale would sweep in
+// stale outputs from removed modules.
+for (const rel of ["src/ui", "src/core", "src/adapters/registry.js", "src/adapters/claude", "src/adapters/chatgpt"]) {
 	cpSync(join(dist, rel), join(stage, rel), { recursive: true });
 }
 

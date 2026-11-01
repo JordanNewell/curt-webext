@@ -13,7 +13,7 @@
 		}
 	},
 	"permissions": ["activeTab", "downloads"],
-	"host_permissions": ["https://claude.ai/*"],
+	"host_permissions": ["https://claude.ai/*", "https://chatgpt.com/*"],
 	"action": {
 		"default_popup": "src/ui/popup.html",
 		"default_title": "Export conversation as .curt"
@@ -22,6 +22,11 @@
 		{
 			"matches": ["https://claude.ai/*"],
 			"js": ["src/adapters/claude/content.js"],
+			"run_at": "document_idle"
+		},
+		{
+			"matches": ["https://chatgpt.com/*"],
+			"js": ["src/adapters/chatgpt/content.js"],
 			"run_at": "document_idle"
 		}
 	]
