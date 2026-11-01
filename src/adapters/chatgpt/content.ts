@@ -100,6 +100,13 @@ export function extractConversation(doc: Document, options: ExtractOptions = {})
 		for (const sel of PROBE_SELECTORS) {
 			probe[sel] = doc.querySelectorAll(sel).length;
 		}
+		probe.__elements = doc.querySelectorAll("*").length;
+		let shadowHosts = 0;
+		for (const el of doc.querySelectorAll("*")) {
+			if ((el as HTMLElement).shadowRoot) shadowHosts++;
+		}
+		probe.__shadowHosts = shadowHosts;
+		probe.__iframes = doc.querySelectorAll("iframe").length;
 	}
 
 	return {

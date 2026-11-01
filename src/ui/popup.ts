@@ -56,7 +56,7 @@ async function exportActiveTab(tab: chrome.tabs.Tab): Promise<void> {
 					.join(" ") || "all-zero"
 			: "";
 		setStatus(
-			`No messages found${result.skippedUnparseable ? ` (${result.skippedUnparseable} node(s) skipped)` : ""}.${probe}`,
+			`No messages found${result.skippedUnparseable ? ` (${result.skippedUnparseable} node(s) skipped)` : ""}.${probe} @ ${result.sourceUrl}`,
 			true,
 		);
 		return;
