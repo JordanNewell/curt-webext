@@ -75,7 +75,9 @@ async function exportActiveTab(tab: chrome.tabs.Tab): Promise<void> {
 	}
 
 	try {
-		const url = URL.createObjectURL(new Blob([body], { type: "text/plain;charset=utf-8" }));
+		// octet-stream, not text/plain: Firefox appends .txt to unknown
+		// extensions served as text — the filename already carries .curt.
+		const url = URL.createObjectURL(new Blob([body], { type: "application/octet-stream" }));
 		const downloadId = await chrome.downloads.download({ url, filename, saveAs: false });
 		setTimeout(() => URL.revokeObjectURL(url), 60_000);
 		setStatus(
