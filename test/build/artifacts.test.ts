@@ -61,14 +61,41 @@ describe.skipIf(!built)("build artifacts (dist/)", () => {
 	});
 
 	it("firefox artifact zip exists and is non-trivial", () => {
-		const artifacts = join(dist, "artifacts");
-		const zips = existsSync(artifacts)
-			? readdirSync(artifacts).filter((f) => f.endsWith(".zip"))
-			: [];
-		expect(zips.length).toBeGreaterThan(0);
-		const zip = join(artifacts, zips[0]);
-		expect(statSync(zip).size).toBeGreaterThan(10_000);
+		const zip = join(dist, "artifacts", "curt_conversation_exporter-1.0.0.zip");
+		// version-pinned path churns on every bump; fall back to globbing
+		const anyZip = existsSync(zip)
+			? zip
+			: join(dist, "artifacts", readdirSync(join(dist, "artifacts")).find((f) => f.endsWith(".zip") && !f.includes("-chrome")) ?? "");
+		expect(statSync(anyZip).size).toBeGreaterThan(10_000);
 	});
+
+	it("chrome store zip contains exactly ONE manifest.json (CWS rejects multiple)", () => {
+		const artifacts = join(dist, "artifacts");
+		const chromeZip = readdirSync(artifacts).find((f) => f.endsWith("-chrome.zip"));
+		expect(chromeZip, "chrome zip missing — run platform/chrome/build.mjs").toBeTruthy();
+		const names = zipEntryNames(join(artifacts, chromeZip!));
+		const manifests = names.filter((n) => n === "manifest.json" || n.endsWith("/manifest.json"));
+		expect(manifests).toEqual(["manifest.json"]);
+		expect(names.some((n) => n.startsWith("firefox/"))).toBe(false);
+		expect(names).toContain("src/ui/popup.js");
+		expect(names).toContain("platform/chrome/service-worker.js");
+	});
+
+	// Zip central-directory filenames are stored uncompressed — parse PK\x01\x02
+	// records and read them. Compressed data is never scanned.
+	function zipEntryNames(zipPath: string): string[] {
+		const buf = new Uint8Array(readFileSync(zipPath));
+		const names: string[] = [];
+		for (let i = 0; i + 46 <= buf.length; i++) {
+			if (buf[i] !== 0x50 || buf[i + 1] !== 0x4b || buf[i + 2] !== 0x01 || buf[i + 3] !== 0x02) continue;
+			const nameLen = buf[i + 28] | (buf[i + 29] << 8);
+			const extraLen = buf[i + 30] | (buf[i + 31] << 8);
+			const commentLen = buf[i + 32] | (buf[i + 33] << 8);
+			names.push(new TextDecoder().decode(buf.slice(i + 46, i + 46 + nameLen)));
+			i += 46 + nameLen + extraLen + commentLen - 1;
+		}
+		return names;
+	}
 
 	it("versions are in lockstep across package.json and both manifests", () => {
 		const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
